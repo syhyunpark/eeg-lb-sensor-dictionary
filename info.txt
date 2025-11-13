@@ -1,0 +1,287 @@
+These are working well: 
+
+lemon_batch_tfr.py
+make_fsaverage_lb_dictionary.py
+compute_phi_lapy.py
+
+
+(
+python - <<'PY'
+from compute_phi_lapy import get_phi_fsaverage
+import numpy as np
+Phi, evals_lh, evals_rh, src = get_phi_fsaverage(K=60, spacing='ico4', combine='sym', verbose=True)
+np.savez_compressed('phi_fsavg_sym_K60_ico4.npz', Phi=Phi, evals_lh=evals_lh, evals_rh=evals_rh)
+print('[ok] Saved phi_fsavg_sym_K60_ico4.npz')
+PY
+)
+
+(
+# Make sure the env var isn't pointing to the placeholder
+unset SUBJECTS_DIR
+
+# Reset MNE's saved config and fetch fsaverage into ~/mne_data/MNE-fsaverage-data
+python - <<'PY'
+import os, mne
+sd = os.path.expanduser('~/mne_data/MNE-fsaverage-data')
+os.makedirs(sd, exist_ok=True)
+mne.set_config('SUBJECTS_DIR', sd, set_env=True)   # set both config and env for this and future sessions
+p = mne.datasets.fetch_fsaverage(verbose=True)     # downloads (or verifies) fsaverage here
+print('SUBJECTS_DIR set to:', mne.get_config('SUBJECTS_DIR'))
+print('fsaverage dir:', p)
+PY
+
+#SUBJECTS_DIR set to: /Users/hyung/mne_data/MNE-fsaverage-data
+#fsaverage dir: /Users/hyung/mne_data/MNE-fsaverage-data/fsaverage
+)
+
+
+
+python make_fsaverage_lb_dictionary.py \
+  --canonical-file canonical_59.txt \
+  --outdir ~/lemon_work \
+  --K 60 \
+  --spacing ico4 \
+  --bem-ico 4
+
+
+
+python plot_lb_modes.py \
+  --dict-npz ~/lemon_work/derivatives/Dict/fsaverage_D_sym_K60_M59_ico4.npz \
+  --outdir ~/lemon_work/fig_lb_modes --modes 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20
+ 
+
+python plot_lb_modes_cortex.py \
+  --phi-npz ~/lemon_work/derivatives/Dict/fsaverage_phi_sym_K60_ico4.npz \
+  --outdir  ~/lemon_work/fig_lb_modes_cortex \
+  --modes 1 \
+  --surface smoothwm \
+  --smoothing 10 \
+  --views lat,med
+
+
+
+python plot_lb_modes_cortex.py \
+  --phi-npz ~/lemon_work/derivatives/Dict/fsaverage_phi_sym_K60_ico4.npz \
+  --outdir  ~/lemon_work/fig_lb_modes_cortex \
+  --modes 1 \
+  --surface smoothwm \
+  --smoothing 10 \
+  --views lat,med
+
+
+
+# LB (59, 32, 19) — note per-subset subdir
+python run_lb_fits.py \
+  --dict-npz  ~/lemon_work/derivatives/Dict/fsaverage_D_sym_K60_M59_ico4.npz \
+  --manifest  ~/lemon_work/derivatives/Y_tfr/manifest.csv \
+  --outdir    ~/lemon_work \
+  --use-bands
+
+python run_lb_fits.py \
+  --dict-npz  ~/lemon_work/derivatives/Dict/fsaverage_D_sym_K60_M59_ico4.npz \
+  --manifest  ~/lemon_work/derivatives/Y_tfr/manifest.csv \
+  --outdir    ~/lemon_work \
+  --use-bands \
+  --subset-file canonical_32.txt
+
+python run_lb_fits.py \
+  --dict-npz  ~/lemon_work/derivatives/Dict/fsaverage_D_sym_K60_M59_ico4.npz \
+  --manifest  ~/lemon_work/derivatives/Y_tfr/manifest.csv \
+  --outdir    ~/lemon_work \
+  --use-bands \
+  --subset-file canonical_19.txt
+
+
+
+# Baselines (59, 32, 19) — also per-subset subdir; uses dict-npz only for channel order
+python run_baselines_pca_ica_sph.py \
+  --dict-npz  ~/lemon_work/derivatives/Dict/fsaverage_D_sym_K60_M59_ico4.npz \
+  --canonical-file canonical_59.txt \
+  --manifest  ~/lemon_work/derivatives/Y_tfr/manifest.csv \
+  --outdir    ~/lemon_work \
+  --use-bands
+
+python run_baselines_pca_ica_sph.py \
+  --dict-npz  ~/lemon_work/derivatives/Dict/fsaverage_D_sym_K60_M59_ico4.npz \
+  --canonical-file canonical_59.txt \
+  --manifest  ~/lemon_work/derivatives/Y_tfr/manifest.csv \
+  --outdir    ~/lemon_work \
+  --use-bands \
+  --subset-file canonical_32.txt
+
+python run_baselines_pca_ica_sph.py \
+  --dict-npz  ~/lemon_work/derivatives/Dict/fsaverage_D_sym_K60_M59_ico4.npz \
+  --canonical-file canonical_59.txt \
+  --manifest  ~/lemon_work/derivatives/Y_tfr/manifest.csv \
+  --outdir    ~/lemon_work \
+  --use-bands \
+  --subset-file canonical_19.txt
+
+
+
+# After running your 3 LB runs and 3 Baseline runs (ALL59 / canonical_32 / canonical_19):
+
+python bootstrap_curves.py \
+  --root   ~/lemon_work/derivatives \
+  --outdir ~/lemon_work/derivatives/Merged_Report \
+  --B 2000 --alpha 0.05
+
+
+
+##
+run_shared_coeffs_icc.py
+
+ROOT="$HOME/lemon_work"
+DICT="$ROOT/derivatives/Dict/fsaverage_D_sym_K60_M59_ico4.npz"
+MANIFEST="$ROOT/derivatives/Y_tfr/manifest.csv"
+CANON="/Users/hyung/Dropbox/LB_eeg/canonical_59.txt"
+SUB32="/Users/hyung/Dropbox/LB_eeg/canonical_32.txt"
+SUB19="/Users/hyung/Dropbox/LB_eeg/canonical_19.txt"
+LAM="--lam=0.005"
+BANDS="--use-bands"
+
+echo "$ROOT"; echo "$DICT"; echo "$MANIFEST"; echo "$CANON"; echo "$SUB32"; echo "$SUB19"
+test -f "$CANON" && echo "OK canonical_59" || echo "MISSING canonical_59"
+test -f "$SUB32" && echo "OK canonical_32"  || echo "MISSING canonical_32"
+test -f "$SUB19" && echo "OK canonical_19"  || echo "MISSING canonical_19"
+
+
+python ./run_shared_coeffs_icc.py --method LB \
+  --dict-npz "$DICT" --canonical-file "$CANON" \
+  --manifest "$MANIFEST" --outdir "$ROOT" \
+  $BANDS --solver ridge $LAM
+
+python ./run_shared_coeffs_icc.py --method LB \
+  --dict-npz "$DICT" --canonical-file "$CANON" \
+  --manifest "$MANIFEST" --outdir "$ROOT" \
+  $BANDS --solver ridge $LAM \
+  --subset-file "$SUB32"
+
+python ./run_shared_coeffs_icc.py --method LB \
+  --dict-npz "$DICT" --canonical-file "$CANON" \
+  --manifest "$MANIFEST" --outdir "$ROOT" \
+  $BANDS --solver ridge $LAM \
+  --subset-file "$SUB19"
+
+
+
+python ./run_shared_coeffs_icc.py --method SPH \
+  --dict-npz "$DICT" --canonical-file "$CANON" \
+  --manifest "$MANIFEST" --outdir "$ROOT" \
+  $BANDS --solver ridge $LAM --Ksph 60
+
+python ./run_shared_coeffs_icc.py --method SPH \
+  --dict-npz "$DICT" --canonical-file "$CANON" \
+  --manifest "$MANIFEST" --outdir "$ROOT" \
+  $BANDS --solver ridge $LAM --Ksph 60 \
+  --subset-file "$SUB32"
+
+python ./run_shared_coeffs_icc.py --method SPH \
+  --dict-npz "$DICT" --canonical-file "$CANON" \
+  --manifest "$MANIFEST" --outdir "$ROOT" \
+  $BANDS --solver ridge $LAM --Ksph 60 \
+  --subset-file "$SUB19"
+
+
+python summarize_icc_coverage.py --root ~/lemon_work --subset ALL59 --thresholds 0.3,0.5
+
+ 
+python plot_lb_modes.py \
+  --dict-npz ~/lemon_work/derivatives/Dict/fsaverage_D_sym_K60_M59_ico4.npz \
+  --outdir ~/lemon_work/fig_lb_modes --modes 6,14,18
+
+python plot_lb_modes.py \
+  --dict-npz ~/lemon_work/derivatives/Dict/fsaverage_D_sym_K60_M59_ico4.npz \
+  --outdir ~/lemon_work/fig_lb_modes --modes 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20
+ 
+
+
+python sph_degree_icc.py \
+  --coeff-csv ~/lemon_work/derivatives/SPH_icc_OLS/ALL59/coefficients_long__SPH__ALL59.csv \
+  --out ~/lemon_work/derivatives/SPH_icc_OLS/ALL59/icc_by_degree__SPH__ALL59.csv
+
+
+python plot_sph_degrees.py \
+  --dict-npz ~/lemon_work/derivatives/Dict/fsaverage_D_sym_K60_M59_ico4.npz \
+  --canonical-file /Users/hyung/Dropbox/LB_eeg/canonical_59.txt \
+  --outdir ~/lemon_work/fig_sph_degrees --Ksph 60
+
+
+
+##
+python plot_lb_modes_cortex.py \
+  --phi-npz ~/lemon_work/derivatives/Dict/fsaverage_phi_sym_K60_ico4.npz \
+  --outdir  ~/lemon_work/fig_lb_modes_cortex \
+  --modes 6,14,18 \
+  --surface smoothwm \
+  --smoothing 10 \
+  --views lat,med
+
+ 
+python plot_lb_modes_cortex.py \
+  --phi-npz ~/lemon_work/derivatives/Dict/fsaverage_phi_sym_K60_ico4.npz \
+  --outdir  ~/lemon_work/fig_lb_modes_cortex \
+  --modes 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 \
+  --surface smoothwm \
+  --smoothing 10 \
+  --views lat,med
+
+
+
+# Reproducible BLAS/OpenMP thread caps (optional)
+export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1
+
+python benchmark_methods.py \
+  --dict-npz  ~/lemon_work/derivatives/Dict/fsaverage_D_sym_K60_M59_ico4.npz \
+  --manifest  ~/lemon_work/derivatives/Y_tfr/manifest.csv \
+  --canonical-file ~/Dropbox/LB_eeg/canonical_59.txt \
+  --outdir    ~/lemon_work \
+  --use-bands \
+  --K 20 \
+  --limit 202 \
+  --repeat 5
+
+
+
+python /Users/hyung/Dropbox/LB_eeg/plot_group_curves.py \
+  --csv "$HOME/lemon_work/derivatives/Merged_Report/group_curves_bootstrap.csv" \
+  --subset ALL59 \
+  --methods LB,SPH,PCA,ICA \
+  --conds EC,EO \
+  --ks 1,4,9,16,25,36 \
+  --legend-fontsize 12 \
+  --hspace 0.34 \
+  --xspacing numeric \
+  --out-png "$HOME/lemon_work/derivatives/Merged_Report/fig_all59_checkpoints_numeric.png" \
+  --out-svg "$HOME/lemon_work/derivatives/Merged_Report/fig_all59_checkpoints_numeric.svg"
+
+
+python /Users/hyung/Dropbox/LB_eeg/plot_group_curves.py \
+  --csv "$HOME/lemon_work/derivatives/Merged_Report/group_curves_bootstrap.csv" \
+  --subset ALL59 \
+  --methods LB,SPH,PCA,ICA \
+  --conds EC,EO \
+  --ks 5,10,20,30 \
+  --legend-fontsize 12 \
+  --hspace 0.34 \
+  --xspacing numeric \
+  --out-png "$HOME/lemon_work/derivatives/Merged_Report/fig_all59_checkpoints_numeric.png" \
+  --out-svg "$HOME/lemon_work/derivatives/Merged_Report/fig_all59_checkpoints_numeric.svg"
+
+
+
+# Activate the same environment you used to produce the CSVs
+# (matplotlib, pandas, numpy must be installed)
+
+python make_k90_boxplots.py \
+  --derivatives ~/lemon_work/derivatives \
+  --outdir ./figs_k90 \
+  --subsets ALL59,canonical_32,canonical_19 \
+  --methods LB,SPH,PCA,ICA \
+  --conditions EC,EO \
+  --dpi 300 \
+  --figsize 9,5 \
+  --no-title \
+  --annotate \
+  --grid
+
