@@ -1,6 +1,6 @@
 # LB EEG (fsaverage)
 
-This repo includes three small scripts that work:
+This repository includes three small scripts that work:
 
 - `compute_phi_lapy.py` — Laplace–Beltrami (LB) eigenmodes on **fsaverage** using LaPy; reindexed to an MNE source space.
 - `make_fsaverage_lb_dictionary.py` — builds a sensor-space dictionary `D = G @ Phi` on **fsaverage** (BEM + forward).
@@ -10,7 +10,7 @@ This repo includes three small scripts that work:
 
 - Python ≥ 3.9  
 - `mne`, `nibabel`, `numpy`, `pandas`, `requests`, `lapy` (and MNE’s fsaverage download)
-- (for `make_fsaverage_lb_dictionary.py`) MNE BEM tools (no FreeSurfer install required; uses MNE’s packaged fsaverage)
+- (for `make_fsaverage_lb_dictionary.py`) MNE BEM tools (no FreeSurfer install required; uses MNE’s packaged fsaverage templates)
 
 Install (example):
 ```bash
@@ -18,7 +18,7 @@ pip install mne nibabel numpy pandas requests lapy
 
 
 
-# Make sure SUBJECTS_DIR isn’t pointing somewhere odd...
+# Make sure SUBJECTS_DIR is not pointing somewhere odd...
 unset SUBJECTS_DIR
 
 python - <<'PY'
@@ -111,3 +111,88 @@ python bootstrap_curves.py \
   --root   ~/lemon_work/derivatives \
   --outdir ~/lemon_work/derivatives/Merged_Report \
   --B 2000 --alpha 0.05
+```
+
+
+
+
+# Build and export the LB sensor dictionary
+
+If you only want the final **cortex-informed sensor-space dictionary** (e.g., no span tests), use:
+
+- `build_lb_sensor_dictionary.py` — builds and exports **two products**:
+  - **`D_native`**: the forward-projected LB dictionary \(D = L\Phi\) (native leadfield scaling)
+  - **`D_unitnorm`**: column-wise unit-norm version of `D_native` for comparable mode scoring
+
+The **mode index \(k\)** follows the LB ordering (increasing eigenvalue; coarse → fine spatial scale).
+
+### Requirements
+- Python ≥ 3.9
+- `mne`, `numpy`, `nibabel`, `lapy` (and MNE’s fsaverage download)
+
+Install:
+```bash
+pip install mne numpy nibabel lapy
+```
+
+### Run (one command)
+
+This will download/verify fsaverage (first run may take a few minutes) and then build the dictionary (also a few minutes).
+
+```bash
+python3 build_lb_sensor_dictionary.py \
+  --outdir ./lb_dictionary_release \
+  --channels-file canonical_59.txt \
+  --K 60 --spacing ico4 --bem-ico 4 \
+  --conductivity 0.3 0.006 0.3 \
+  --combine sym \
+  --overwrite
+```
+
+### Outputs
+
+Written under ./lb_dictionary_release/:
+- D_native_fsaverage_ico4_K60_M59_bemico4.npz
+- D_unitnorm_fsaverage_ico4_K60_M59_bemico4.npz
+- metadata.json (build parameters + versions) 
+
+Each .npz contains:
+- D (shape M × K)
+- channels (row order)
+- col_norms where col_norms[k] = ||D_native[:,k]||2 (used to convert between native and unit-norm)
+- evals_lh, evals_rh (hemispheric LB eigenvalues; increasing order)
+
+### Load in Python
+
+```python
+import numpy as np
+
+d = np.load("./lb_dictionary_release/D_native_fsaverage_ico4_K60_M59_bemico4.npz", allow_pickle=True)
+D = d["D"]                      # (M, K)
+channels = list(d["channels"])  # row order of D
+col_norms = d["col_norms"]      # ||D_native[:,k]||2
+evals_lh = d["evals_lh"]        # LH eigenvalues (in increasing order)
+evals_rh = d["evals_rh"]        # RH eigenvalues (in increasing order)
+```
+
+### Native vs unit-norm dictionary
+- **Native scaling (D_native)**: most literal interpretation (“column k is the scalp projection of cortical mode k”).
+- **Unit-norm (D_unitnorm)**: removes mode-dependent "gain" differences induced by the leadfield, useful for dot-products / correlations / “activation strength” comparisons across modes.
+
+Load unit-norm:
+```python
+import numpy as np
+
+du = np.load("./lb_dictionary_release/D_unitnorm_fsaverage_ico4_K60_M59_bemico4.npz", allow_pickle=True)
+D_unit = du["D"]
+```
+
+### Project a scalp map y onto the dictionary
+Assuming y is in the same channel order as channels:
+```python
+import numpy as np
+
+# OLS coefficients in native column coordinates
+c_native, *_ = np.linalg.lstsq(D, y, rcond=None)
+y_hat = D @ c_native
+```
