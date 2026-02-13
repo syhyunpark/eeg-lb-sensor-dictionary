@@ -58,7 +58,7 @@ python lemon_batch_tfr.py \
   --win-len 10 --fmin 2 --fmax 30 --n-freqs 15 --cycles-rule constQ --decim 2
 
 
-
+## span test
 # LB (59, 32, 19) (note per-subset subdir) 
 python run_lb_fits.py \
   --dict-npz  ~/lemon_work/derivatives/Dict/fsaverage_D_sym_K60_M59_ico4.npz \
@@ -106,11 +106,28 @@ python run_baselines_pca_ica_sph.py \
   --subset-file canonical_19.txt
 
 
-## After running your 3 LB runs and 3 Baseline runs (ALL59 / canonical_32 / canonical_19):
+## After running the 3 LB runs and 3 Baseline runs (ALL59 / canonical_32 / canonical_19) above, run this for bootstrap summary:
 python bootstrap_curves.py \
   --root   ~/lemon_work/derivatives \
   --outdir ~/lemon_work/derivatives/Merged_Report \
   --B 2000 --alpha 0.05
+
+
+## Cortex mode visualization
+python3 plot_lb_modes_cortex.py \
+  --phi-npz ~/lemon_work/derivatives/Dict/fsaverage_phi_sym_K60_ico4.npz \
+  --outdir  ~/lemon_work/fig_lb_modes_cortex \
+  --modes 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 \
+  --surface smoothwm \
+  --smoothing 10 \
+  --views lat,med \
+  --cmap RdBu_r  
+
+## Sensor mode visualization
+python3 plot_lb_modes.py \
+  --dict-npz ~/lemon_work/derivatives/Dict/fsaverage_D_sym_K60_M59_ico4.npz \
+  --outdir ~/lemon_work/fig_lb_modes \
+  --modes 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20
 ```
 
 
