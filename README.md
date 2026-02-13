@@ -135,7 +135,7 @@ Install:
 pip install mne numpy nibabel lapy
 ```
 
-### Run (one command)
+### Run
 
 This will download/verify fsaverage (first run may take a few minutes) and then build the dictionary (also a few minutes).
 
@@ -149,6 +149,29 @@ python3 build_lb_sensor_dictionary.py \
   --overwrite
 ```
 
+### Options and defaults
+- --channels-file: text file, one channel per line. 
+- --montage (default: standard_1005): used to assign sensor 3D positions.
+- --subject (default: fsaverage)
+- --subjects-dir (default: auto-set to ~/mne_data/MNE-fsaverage-data)
+- --trans (default: fsaverage)
+- --K (default: 60): number of modes per hemisphere used in compute_phi_lapy.py. With --combine sym, the output has K columns.
+- --combine (default: sym): use the “stack LH + sign-aligned RH” whole-cortex construction.
+- --spacing (default: ico4)
+- --bem-ico (default: 4)
+- --conductivity (default: 0.3 0.006 0.3) in S/m for (scalp, skull, brain)
+- --mindist (default: 5.0) mm
+- --overwrite: overwrite existing outputs
+
+- channels-file is a plain text file with one channel name per line, in the exact order you want the dictionary rows to follow.
+Example (canonical_59.txt):
+```
+Fp1
+Fp2
+F7
+...
+```
+  
 ### Outputs
 
 Written under ./lb_dictionary_release/:
@@ -159,7 +182,7 @@ Written under ./lb_dictionary_release/:
 Each .npz contains:
 - D (shape M × K)
 - channels (row order)
-- col_norms where col_norms[k] = ||D_native[:,k]||2 (used to convert between native and unit-norm)
+- col_norms where col_norms[k] = ||D_native[:,k]||_2 (used to convert between native and unit-norm)
 - evals_lh, evals_rh (hemispheric LB eigenvalues; increasing order)
 
 ### Load in Python
